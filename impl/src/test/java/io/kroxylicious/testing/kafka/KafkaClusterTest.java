@@ -135,7 +135,6 @@ public class KafkaClusterTest {
         try (var cluster = KafkaClusterFactory.create(KafkaClusterConfig.builder()
                 .testInfo(testInfo)
                 .brokerKeytoolCertificateGenerator(brokerKeytoolCertificateGenerator)
-                .clientKeytoolCertificateGenerator(clientKeytoolCertificateGenerator)
                 .kraftMode(true)
                 .securityProtocol("SASL_SSL")
                 .saslMechanism("PLAIN")
@@ -152,7 +151,6 @@ public class KafkaClusterTest {
         try (var cluster = KafkaClusterFactory.create(KafkaClusterConfig.builder()
                 .testInfo(testInfo)
                 .brokerKeytoolCertificateGenerator(brokerKeytoolCertificateGenerator)
-                .clientKeytoolCertificateGenerator(clientKeytoolCertificateGenerator)
                 .kraftMode(true)
                 .securityProtocol("SSL")
                 .build())) {
@@ -167,7 +165,6 @@ public class KafkaClusterTest {
         try (var cluster = KafkaClusterFactory.create(KafkaClusterConfig.builder()
                 .testInfo(testInfo)
                 .brokerKeytoolCertificateGenerator(brokerKeytoolCertificateGenerator)
-                .clientKeytoolCertificateGenerator(clientKeytoolCertificateGenerator)
                 .kraftMode(false)
                 .securityProtocol("SASL_SSL")
                 .saslMechanism("PLAIN")
@@ -184,7 +181,6 @@ public class KafkaClusterTest {
         try (var cluster = KafkaClusterFactory.create(KafkaClusterConfig.builder()
                 .testInfo(testInfo)
                 .brokerKeytoolCertificateGenerator(brokerKeytoolCertificateGenerator)
-                .clientKeytoolCertificateGenerator(clientKeytoolCertificateGenerator)
                 .kraftMode(false)
                 .securityProtocol("SSL")
                 .build())) {
@@ -194,7 +190,7 @@ public class KafkaClusterTest {
     }
 
     @Test
-    public void kafkaClusterKraftModeClientNoAuthServerSSL() throws Exception {
+    public void kafkaClusterKraftModeSSL_ClientUsesSSLClientAuth() throws Exception {
         try (var cluster = KafkaClusterFactory.create(KafkaClusterConfig.builder()
                 .testInfo(testInfo)
                 .brokerKeytoolCertificateGenerator(brokerKeytoolCertificateGenerator)
