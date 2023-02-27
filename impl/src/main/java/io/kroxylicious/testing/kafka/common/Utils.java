@@ -6,12 +6,6 @@
 
 package io.kroxylicious.testing.kafka.common;
 
-import org.apache.kafka.clients.admin.Admin;
-import org.apache.kafka.common.Node;
-import org.awaitility.Awaitility;
-import org.hamcrest.Matchers;
-import org.slf4j.Logger;
-
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.InetAddress;
@@ -27,6 +21,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import org.apache.kafka.clients.admin.Admin;
+import org.apache.kafka.common.Node;
+import org.awaitility.Awaitility;
+import org.hamcrest.Matchers;
+import org.slf4j.Logger;
 
 import static java.util.function.Predicate.not;
 import static org.apache.kafka.clients.CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG;
@@ -64,7 +64,7 @@ public class Utils {
         var originalBootstrap = String.valueOf(connectionConfig.get(BOOTSTRAP_SERVERS_CONFIG));
         toProbe.addAll(Arrays.asList(originalBootstrap.split(",")));
 
-        while(knownReady.size() < expectedBrokerCount) {
+        while (knownReady.size() < expectedBrokerCount) {
             if (toProbe.isEmpty()) {
                 throw new IllegalArgumentException(String.format("Ran out of addresses to probe before cluster ready: %s", originalBootstrap));
             }
@@ -87,8 +87,8 @@ public class Utils {
                                 log.info("got nodes: {}", nodes);
 
                                 toProbe.addAll(nodes.stream().filter(not(Node::isEmpty))
-                                                             .map(Utils::nodeToAddr)
-                                                             .filter(not(knownReady::contains)).collect(Collectors.toSet()));
+                                        .map(Utils::nodeToAddr)
+                                        .filter(not(knownReady::contains)).collect(Collectors.toSet()));
                                 return nodes;
                             }
                             catch (InterruptedException | ExecutionException e) {

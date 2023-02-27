@@ -5,18 +5,6 @@
  */
 package io.kroxylicious.testing.kafka.testcontainers;
 
-import com.github.dockerjava.api.command.InspectContainerResponse;
-import lombok.SneakyThrows;
-import org.apache.kafka.common.config.SslConfigs;
-import org.junit.jupiter.api.TestInfo;
-import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.Network;
-import org.testcontainers.containers.output.OutputFrame;
-import org.testcontainers.images.builder.Transferable;
-import org.testcontainers.lifecycle.Startable;
-import org.testcontainers.lifecycle.Startables;
-import org.testcontainers.utility.DockerImageName;
-
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileWriter;
@@ -40,9 +28,23 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import org.apache.kafka.common.config.SslConfigs;
+import org.junit.jupiter.api.TestInfo;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.Network;
+import org.testcontainers.containers.output.OutputFrame;
+import org.testcontainers.images.builder.Transferable;
+import org.testcontainers.lifecycle.Startable;
+import org.testcontainers.lifecycle.Startables;
+import org.testcontainers.utility.DockerImageName;
+
+import com.github.dockerjava.api.command.InspectContainerResponse;
+
 import io.kroxylicious.testing.kafka.api.KafkaCluster;
 import io.kroxylicious.testing.kafka.common.KafkaClusterConfig;
 import io.kroxylicious.testing.kafka.common.Utils;
+
+import lombok.SneakyThrows;
 
 import static io.kroxylicious.testing.kafka.common.Utils.awaitExpectedBrokerCountInCluster;
 
