@@ -12,6 +12,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
 
 import org.apache.kafka.clients.admin.Admin;
 import org.apache.kafka.clients.admin.NewTopic;
@@ -24,6 +26,9 @@ import org.apache.kafka.common.serialization.StringSerializer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import io.kroxylicious.testing.kafka.api.KafkaCluster;
 import io.kroxylicious.testing.kafka.clients.CloseableAdmin;
@@ -109,6 +114,33 @@ public class KafkaClusterTest {
             assertThat(cluster.getNumOfBrokers()).isEqualTo(brokersNum - 1);
             assertThat(cluster.getBootstrapServers().split(",")).hasSize(brokersNum - 1);
             verifyRecordRoundTrip(brokersNum - 1, cluster);
+        }
+    }
+
+    public static Stream<Arguments> restartBrokers() {
+        return Stream.of(
+                Arguments.of(1, true, true, (Predicate<Integer>) node -> true),
+                Arguments.of(2, true, true, (Predicate<Integer>) node -> node == 1),
+                Arguments.of(2, true, true, (Predicate<Integer>) node -> true),
+                Arguments.of(1, true, false, (Predicate<Integer>) node -> true),
+                Arguments.of(1, false, true, (Predicate<Integer>) node -> true));
+    }
+
+    @ParameterizedTest
+    @MethodSource
+    public void restartBrokers(int brokersNum, boolean kraft, boolean abruptShutdown, Predicate<Integer> integerPredicate) throws Exception {
+        try (var cluster = KafkaClusterFactory.create(KafkaClusterConfig.builder()
+                .testInfo(testInfo)
+                .brokersNum(brokersNum)
+                .kraftMode(kraft)
+                .build())) {
+            cluster.start();
+            assertThat(cluster.getNumOfBrokers()).isEqualTo(brokersNum);
+            verifyRecordRoundTrip(brokersNum, cluster);
+
+            cluster.restartBrokers(integerPredicate, abruptShutdown);
+
+            verifyRecordRoundTrip(brokersNum, cluster);
         }
     }
 

@@ -24,6 +24,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -320,21 +321,27 @@ public class InVMKafkaCluster implements KafkaCluster, KafkaClusterConfig.KafkaE
         s.awaitShutdown();
     }
 
+    @Override
+    public synchronized void restartBrokers(Predicate<Integer> nodeIdPredicate, boolean abruptShutdown) {
+        var kafkaServersToRestart = servers.entrySet().stream().filter(e -> nodeIdPredicate.test(e.getKey()))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+        orderedShutdownServers(kafkaServersToRestart, true);
+
+        kafkaServersToRestart.forEach((key, value) -> {
+            var configHolder = clusterConfig.generateConfigForSpecificNode(this, key);
+            var replacement = buildKafkaServer(configHolder);
+            tryToStartServerWithRetry(configHolder, replacement);
+            servers.put(key, replacement);
+        });
+    }
+
     @SuppressWarnings("ResultOfMethodCallIgnored")
     @Override
     public synchronized void close() throws Exception {
         try {
             try {
-                // with kraft, if we don't shut down the controller last, we sometimes see a hang.
-                // https://issues.apache.org/jira/browse/KAFKA-14287
-                servers.entrySet().stream()
-                        .filter(e -> !portsAllocator.hasRegisteredPort(Listener.CONTROLLER, e.getKey()))
-                        .map(Map.Entry::getValue)
-                        .forEach(Server::shutdown);
-                servers.entrySet().stream()
-                        .filter(e -> portsAllocator.hasRegisteredPort(Listener.CONTROLLER, e.getKey()))
-                        .map(Map.Entry::getValue)
-                        .forEach(Server::shutdown);
+                orderedShutdownServers(servers, false);
             }
             finally {
                 if (zooServer != null) {
@@ -351,6 +358,29 @@ public class InVMKafkaCluster implements KafkaCluster, KafkaClusterConfig.KafkaE
                     s.forEach(File::delete);
                 }
             }
+        }
+    }
+
+    /**
+     * Workaround for <a href="https://issues.apache.org/jira/browse/KAFKA-14287">KAFKA-14287</a>.
+     * with kraft, if we don't shut down the controller last, we sometimes see a hang.
+     */
+    private void orderedShutdownServers(Map<Integer, Server> servers, boolean await) {
+        var noneControllers = servers.entrySet().stream()
+                .filter(e -> !portsAllocator.hasRegisteredPort(Listener.CONTROLLER, e.getKey()))
+                .map(Map.Entry::getValue)
+                .toList();
+        noneControllers.forEach(Server::shutdown);
+        if (await) {
+            noneControllers.forEach(Server::awaitShutdown);
+        }
+
+        var controllers = servers.entrySet().stream()
+                .filter(e -> portsAllocator.hasRegisteredPort(Listener.CONTROLLER, e.getKey()))
+                .map(Map.Entry::getValue).toList();
+        controllers.forEach(Server::shutdown);
+        if (await) {
+            controllers.forEach(Server::awaitShutdown);
         }
     }
 

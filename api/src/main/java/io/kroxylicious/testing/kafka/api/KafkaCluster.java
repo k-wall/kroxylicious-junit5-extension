@@ -7,6 +7,7 @@
 package io.kroxylicious.testing.kafka.api;
 
 import java.util.Map;
+import java.util.function.Predicate;
 
 /**
  * A KafkaCluster, from which is it possible to create/connect clients.
@@ -41,6 +42,22 @@ public interface KafkaCluster extends AutoCloseable {
      * @throws IllegalArgumentException      the node identified by <code>node.id</code> does not exist.
      */
     void removeBroker(int nodeId) throws UnsupportedOperationException, IllegalArgumentException;
+
+    /**
+     * Restarts the broker(s) identified by the supplied predicate.  Once this method returns the
+     * caller is guaranteed that the broker(s) have been restarted and have been reincorporated into the
+     * cluster.
+     * <br/>
+     * The caller may specify <code>abruptShutdown</code> true.  If this is the case, the kafka broker
+     * will be abruptly killed, rather than undergoing a graceful shutdown. This may be useful to test cases
+     * wishing to explore networking edge cases.  The implementation may ignore this parameter if the
+     * implementation is unable to support the requested style of shutdown. In this case, the implementation
+     * is free to use an alternative shutdown style instead.
+     * <br/>
+     * @param nodeIdPredicate predicate that returns true if the node identified by the given nodeId should be restarted
+     * @param abruptShutdown if true, kafka broker will be abruptly killed.
+     */
+    void restartBrokers(Predicate<Integer> nodeIdPredicate, boolean abruptShutdown);
 
     /**
      * stops the cluster.

@@ -6,6 +6,7 @@ Please enumerate all user-facing changes using format `<githib issue/pr number>:
 
 ## 0.5.0
 
+* [#86](https://github.com/kroxylicious/kroxylicious-junit5-extension/issues/86) Added API to restart one or more brokers of a kafka cluster.
 * [#134](https://github.com/kroxylicious/kroxylicious-junit5-extension/pull/134): Support @BeforeEach and test cases referring to same cluster
 * [#130](https://github.com/kroxylicious/kroxylicious-junit5-extension/pull/130): Small KeytoolCertificateGenerator improvements (eliminates use of openssl)
 
