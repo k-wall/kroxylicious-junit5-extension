@@ -327,7 +327,7 @@ public class InVMKafkaCluster implements KafkaCluster, KafkaClusterConfig.KafkaE
         var kafkaServersToRestart = servers.entrySet().stream().filter(e -> nodeIdPredicate.test(e.getKey()))
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
-        orderedShutdownServers(kafkaServersToRestart, true);
+        roleOrderedShutdown(kafkaServersToRestart, true);
 
         kafkaServersToRestart.forEach((key, value) -> {
             var configHolder = clusterConfig.generateConfigForSpecificNode(this, key);
@@ -342,7 +342,7 @@ public class InVMKafkaCluster implements KafkaCluster, KafkaClusterConfig.KafkaE
     public synchronized void close() throws Exception {
         try {
             try {
-                orderedShutdownServers(servers, false);
+                roleOrderedShutdown(servers, false);
             }
             finally {
                 if (zooServer != null) {
@@ -366,7 +366,7 @@ public class InVMKafkaCluster implements KafkaCluster, KafkaClusterConfig.KafkaE
      * Workaround for <a href="https://issues.apache.org/jira/browse/KAFKA-14287">KAFKA-14287</a>.
      * with kraft, if we don't shut down the controller last, we sometimes see a hang.
      */
-    private void orderedShutdownServers(Map<Integer, Server> servers, boolean await) {
+    private void roleOrderedShutdown(Map<Integer, Server> servers, boolean await) {
         var justBrokers = servers.entrySet().stream()
                 .filter(e -> !portsAllocator.hasRegisteredPort(Listener.CONTROLLER, e.getKey()))
                 .map(Map.Entry::getValue)
