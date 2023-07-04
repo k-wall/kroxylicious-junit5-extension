@@ -11,12 +11,14 @@ import java.net.Socket;
 import java.security.GeneralSecurityException;
 import java.time.Duration;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.apache.kafka.clients.admin.Admin;
@@ -35,8 +37,6 @@ import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-
-import junit.framework.AssertionFailedError;
 
 import io.kroxylicious.testing.kafka.api.KafkaCluster;
 import io.kroxylicious.testing.kafka.api.TerminationStyle;
@@ -150,28 +150,17 @@ public class KafkaClusterTest {
 
             var nodes = describeClusterNodes(cluster);
 
-            var brokersExpectedDown = nodes.stream().filter(n -> integerPredicate.test(n.id())).toList();
-            var brokerInUnexpectedState = new AtomicReference<AssertionFailedError>();
+            var brokersExpectedDown = nodes.stream().filter(n -> integerPredicate.test(n.id())).collect(Collectors.toMap(Node::id, Function.identity()));
+            final Set<Integer> failedToRestart = new HashSet<>(brokersExpectedDown.keySet());
 
-            cluster.restartBrokers(integerPredicate, terminationStyle, () -> {
-                // The broker(s) are now expected to be down, check this is so by probing the host/port.
-                try {
-                    brokersExpectedDown.forEach(this::assertBrokerRefusesConnection);
-                }
-                catch (AssertionFailedError e) {
-                    brokerInUnexpectedState.set(e);
-                }
-                catch (Throwable t) {
-                    var afe = new AssertionFailedError(t.getMessage());
-                    afe.initCause(t);
-                    brokerInUnexpectedState.set(afe);
-                }
+            cluster.restartBrokers(integerPredicate, terminationStyle, (stoppedBroker) -> {
+                assertBrokerRefusesConnection(brokersExpectedDown.get(stoppedBroker));
+                failedToRestart.remove(stoppedBroker);
             });
 
-            if (brokerInUnexpectedState.get() != null) {
-                throw brokerInUnexpectedState.get();
+            if (!failedToRestart.isEmpty()) {
+                throw new AssertionError("BrokerIds: " + failedToRestart + " were not restarted");
             }
-
             // ensures that all brokers of the cluster are back in service.
             verifyRecordRoundTrip(brokersNum, cluster);
         }

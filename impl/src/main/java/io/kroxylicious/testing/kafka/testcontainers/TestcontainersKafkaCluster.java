@@ -24,6 +24,7 @@ import java.util.TreeMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -42,6 +43,7 @@ import org.testcontainers.lifecycle.Startable;
 import org.testcontainers.lifecycle.Startables;
 import org.testcontainers.utility.DockerImageName;
 
+import com.github.dockerjava.api.command.InspectContainerCmd;
 import com.github.dockerjava.api.command.InspectContainerResponse;
 import com.github.dockerjava.api.exception.NotFoundException;
 
@@ -54,6 +56,7 @@ import io.kroxylicious.testing.kafka.common.KafkaClusterConfig;
 import io.kroxylicious.testing.kafka.common.PortAllocator;
 import io.kroxylicious.testing.kafka.common.Utils;
 
+import static io.kroxylicious.testing.kafka.common.Utils.awaitCondition;
 import static io.kroxylicious.testing.kafka.common.Utils.awaitExpectedBrokerCountInClusterViaTopic;
 
 /**
@@ -344,12 +347,17 @@ public class TestcontainersKafkaCluster implements Startable, KafkaCluster, Kafk
     }
 
     @Override
-    public synchronized void restartBrokers(Predicate<Integer> nodeIdPredicate, TerminationStyle terminationStyle, Runnable onBrokersStopped) {
-        var kafkaContainersToRestart = brokers.entrySet().stream().filter(e -> nodeIdPredicate.test(e.getKey())).map(Map.Entry::getValue).toList();
+    public synchronized void restartBrokers(Predicate<Integer> nodeIdPredicate, TerminationStyle terminationStyle, Consumer<Integer> onBrokerStopped) {
+        var kafkaContainersToRestart = brokers.entrySet().stream().filter(e -> nodeIdPredicate.test(e.getKey()))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
-        var inspectCommands = kafkaContainersToRestart.stream().map(kc -> kc.getDockerClient().inspectContainerCmd(kc.getContainerId())).toList();
+        var inspectCommands = kafkaContainersToRestart.entrySet().stream().map(entry -> {
+            var kc = entry.getValue();
+            final InspectContainerCmd inspectCmd = entry.getValue().getDockerClient().inspectContainerCmd(kc.getContainerId());
+            return Map.entry(entry.getKey(), inspectCmd);
+        }).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
-        kafkaContainersToRestart.forEach(kc -> {
+        kafkaContainersToRestart.forEach((ignored, kc) -> {
             if (terminationStyle == TerminationStyle.ABRUPT) {
                 kc.stop();
             }
@@ -359,17 +367,17 @@ public class TestcontainersKafkaCluster implements Startable, KafkaCluster, Kafk
         });
 
         // Await the existing containers going away.
-        inspectCommands.forEach(inspectContainer -> {
-            Utils.awaitCondition(Long.valueOf(STARTUP_TIMEOUT.toMillis()).intValue(), TimeUnit.MILLISECONDS).until(() -> {
-                try {
-                    inspectContainer.exec();
-                }
-                catch (NotFoundException e) {
-                    return true;
-                }
-                return false;
-            });
-        });
+        inspectCommands.forEach((brokerId, inspectContainer) -> awaitCondition(Long.valueOf(STARTUP_TIMEOUT.toMillis()).intValue(), TimeUnit.MILLISECONDS)
+                .until(() -> {
+                    try {
+                        inspectContainer.exec();
+                    }
+                    catch (NotFoundException e) {
+                        onBrokerStopped.accept(brokerId);
+                        return true;
+                    }
+                    return false;
+                }));
 
         if (zookeeper != null) {
             // In the zookeeper case, may as well wait for the session timeout. The replacement kafka broker
@@ -389,39 +397,31 @@ public class TestcontainersKafkaCluster implements Startable, KafkaCluster, Kafk
                         }
                     });
         }
-
-        try {
-            if (onBrokersStopped != null) {
-                onBrokersStopped.run();
+        LOGGER.log(Level.DEBUG, "Restarting {0}/{1} broker(s)", kafkaContainersToRestart.size(), getNumOfBrokers());
+        kafkaContainersToRestart.forEach((brokerId, kc) -> {
+            var originalStartupAttempts = kc.getStartupAttempts();
+            try {
+                // We need to control the restart loop ourselves. Unfortunately testcontainers does not
+                // allow a delay to be introduced between startup attempts and start-ups in a tight loop
+                // seems to lead to podman unreliability (at least on the Mac).
+                kc.withStartupAttempts(1);
+                Awaitility.waitAtMost(STARTUP_TIMEOUT)
+                        .pollDelay(RESTART_BACKOFF_DELAY).until(() -> {
+                            try {
+                                kc.start();
+                            }
+                            catch (Exception e) {
+                                kc.stop();
+                                LOGGER.log(Level.DEBUG, "Failed to restart container for " + brokerId, e);
+                                throw new RuntimeException(e);
+                            }
+                            return null;
+                        });
             }
-        }
-        finally {
-            LOGGER.log(Level.DEBUG, "Restarting {0}/{1} broker(s)", kafkaContainersToRestart.size(), getNumOfBrokers());
-            kafkaContainersToRestart.forEach(kc -> {
-                var originalStartupAttempts = kc.getStartupAttempts();
-                try {
-                    // We need to control the restart loop ourselves. Unfortunately testcontainers does not
-                    // allow a delay to be introduced between startup attempts and start-ups in a tight loop
-                    // seems to lead to podman unreliability (at least on the Mac).
-                    kc.withStartupAttempts(1);
-                    Awaitility.waitAtMost(STARTUP_TIMEOUT)
-                            .pollDelay(RESTART_BACKOFF_DELAY).until(() -> {
-                                try {
-                                    kc.start();
-                                }
-                                catch (Exception e) {
-                                    kc.stop();
-                                    LOGGER.log(Level.DEBUG, "Failed to restart container", e);
-                                    throw new RuntimeException(e);
-                                }
-                                return null;
-                            });
-                }
-                finally {
-                    kc.setStartupAttempts(originalStartupAttempts);
-                }
-            });
-        }
+            finally {
+                kc.setStartupAttempts(originalStartupAttempts);
+            }
+        });
 
         LOGGER.log(Level.DEBUG, "Awaiting for the expected number of brokers {0} to be available again", getNumOfBrokers());
         Utils.awaitExpectedBrokerCountInClusterViaTopic(

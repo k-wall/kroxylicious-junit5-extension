@@ -7,6 +7,7 @@
 package io.kroxylicious.testing.kafka.api;
 
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 /**
@@ -62,9 +63,9 @@ public interface KafkaCluster extends AutoCloseable {
      *
      * @param nodeIdPredicate  predicate that returns true if the node identified by the given nodeId should be restarted
      * @param terminationStyle the style of termination used to shut down the broker(s).
-     * @param onBrokersStopped callback to invoked when all brokers are stopped, before restart commences. may be null.
+     * @param onBrokerStopped  callback to invoked when all brokers are stopped, before restart commences. may be null.
      */
-    void restartBrokers(Predicate<Integer> nodeIdPredicate, TerminationStyle terminationStyle, Runnable onBrokersStopped);
+    void restartBrokers(Predicate<Integer> nodeIdPredicate, TerminationStyle terminationStyle, Consumer<Integer> onBrokerStopped);
 
     /**
      * stops the cluster.
