@@ -28,6 +28,7 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import io.kroxylicious.testing.kafka.api.TerminationStyle;
 import org.apache.kafka.common.utils.Time;
 import org.apache.zookeeper.server.ServerCnxnFactory;
 import org.apache.zookeeper.server.ZooKeeperServer;
@@ -322,7 +323,7 @@ public class InVMKafkaCluster implements KafkaCluster, KafkaClusterConfig.KafkaE
     }
 
     @Override
-    public synchronized void restartBrokers(Predicate<Integer> nodeIdPredicate, boolean abruptShutdown) {
+    public synchronized void restartBrokers(Predicate<Integer> nodeIdPredicate, TerminationStyle terminationStyle) {
         var kafkaServersToRestart = servers.entrySet().stream().filter(e -> nodeIdPredicate.test(e.getKey()))
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 

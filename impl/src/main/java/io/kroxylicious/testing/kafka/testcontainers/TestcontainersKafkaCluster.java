@@ -30,6 +30,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
+import io.kroxylicious.testing.kafka.api.TerminationStyle;
 import org.apache.kafka.common.config.SslConfigs;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.TestInfo;
@@ -342,13 +343,13 @@ public class TestcontainersKafkaCluster implements Startable, KafkaCluster, Kafk
     }
 
     @Override
-    public synchronized void restartBrokers(Predicate<Integer> nodeIdPredicate, boolean abruptShutdown) {
+    public synchronized void restartBrokers(Predicate<Integer> nodeIdPredicate, TerminationStyle terminationStyle) {
         var kafkaContainersToRestart = brokers.entrySet().stream().filter(e -> nodeIdPredicate.test(e.getKey())).map(Map.Entry::getValue).toList();
 
         var inspectCommands = kafkaContainersToRestart.stream().map(kc -> kc.getDockerClient().inspectContainerCmd(kc.getContainerId())).toList();
 
         kafkaContainersToRestart.forEach(kc -> {
-            if (abruptShutdown) {
+            if (terminationStyle == TerminationStyle.ABRUPT) {
                 kc.stop();
             }
             else {

@@ -48,16 +48,17 @@ public interface KafkaCluster extends AutoCloseable {
      * caller is guaranteed that the broker(s) have been restarted and have been reincorporated into the
      * cluster.
      * <br/>
-     * The caller may specify <code>abruptShutdown</code> true.  If this is the case, the kafka broker
-     * will be abruptly killed, rather than undergoing a graceful shutdown. This may be useful to test cases
+     * The caller specifies a <code>terminationStyle</code>.  If it is set {@link TerminationStyle#ABRUPT}, the kafka
+     * broker(s) will be abruptly killed, rather than undergoing a graceful shutdown. This may be useful to test cases
      * wishing to explore networking edge cases.  The implementation may ignore this parameter if the
-     * implementation is unable to support the requested style of shutdown. In this case, the implementation
-     * is free to use an alternative shutdown style instead.
+     * implementation is unable to support the requested style of termination. In this case, the implementation
+     * is free to use an alternative termination style instead.
      * <br/>
-     * @param nodeIdPredicate predicate that returns true if the node identified by the given nodeId should be restarted
-     * @param abruptShutdown if true, kafka broker will be abruptly killed.
+     *
+     * @param nodeIdPredicate  predicate that returns true if the node identified by the given nodeId should be restarted
+     * @param terminationStyle the style of termination used to shut down the broker(s).
      */
-    void restartBrokers(Predicate<Integer> nodeIdPredicate, boolean abruptShutdown);
+    void restartBrokers(Predicate<Integer> nodeIdPredicate, TerminationStyle terminationStyle);
 
     /**
      * stops the cluster.
