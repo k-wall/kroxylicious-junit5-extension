@@ -32,9 +32,9 @@ import java.util.stream.Stream;
 
 import io.kroxylicious.testing.kafka.api.TerminationStyle;
 import org.apache.kafka.common.config.SslConfigs;
+import org.awaitility.Awaitility;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.TestInfo;
-import org.rnorth.ducttape.unreliables.Unreliables;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.output.OutputFrame;
@@ -78,6 +78,7 @@ public class TestcontainersKafkaCluster implements Startable, KafkaCluster, Kafk
     private static final int CONTAINER_STARTUP_ATTEMPTS = 3;
     private static final Duration MINIMUM_RUNNING_DURATION = Duration.ofSeconds(5);
     private static final Duration STARTUP_TIMEOUT = Duration.ofMinutes(2);
+    private static final Duration RESTART_BACKOFF_DELAY = Duration.ofSeconds(5);
     private static DockerImageName DEFAULT_KAFKA_IMAGE = DockerImageName.parse(QUAY_KAFKA_IMAGE_REPO + ":latest-snapshot");
     private static DockerImageName DEFAULT_ZOOKEEPER_IMAGE = DockerImageName.parse(QUAY_ZOOKEEPER_IMAGE_REPO + ":latest-snapshot");
     private static final int READY_TIMEOUT_SECONDS = 120;
@@ -377,7 +378,7 @@ public class TestcontainersKafkaCluster implements Startable, KafkaCluster, Kafk
             var config = clusterConfig.getBrokerConfigs(() -> this).findFirst();
             var zkSessionTimeout = config.map(KafkaClusterConfig.ConfigHolder::getProperties).map(p -> p.getProperty(KafkaConfig.ZkSessionTimeoutMsProp(), "0"))
                     .map(Long::parseLong);
-            zkSessionTimeout.ifPresent(
+            zkSessionTimeout.filter(timeout -> timeout > 0).ifPresent(
                     timeOut -> {
                         try {
                             LOGGER.log(Level.DEBUG, "Awaiting zookeeper session timeout {0}ms so that the broker ephemeral nodes expire.", timeOut);
@@ -397,16 +398,14 @@ public class TestcontainersKafkaCluster implements Startable, KafkaCluster, Kafk
                 // allow a delay to be introduced between startup attempts and start-ups in a tight loop
                 // seems to lead to podman unreliability (at least on the Mac).
                 kc.withStartupAttempts(1);
-                Unreliables.retryUntilSuccess(Long.valueOf(STARTUP_TIMEOUT.toMillis()).intValue(), TimeUnit.MILLISECONDS,
-                        () -> {
+                Awaitility.waitAtMost(STARTUP_TIMEOUT)
+                        .pollDelay(RESTART_BACKOFF_DELAY).until(() -> {
                             try {
                                 kc.start();
                             }
                             catch (Exception e) {
                                 kc.stop();
-                                long backoff = 5000;
-                                LOGGER.log(Level.DEBUG, "Failed to restart container, backing off for {0} ms", backoff, e);
-                                Thread.sleep(backoff);
+                                LOGGER.log(Level.DEBUG, "Failed to restart container", e);
                                 throw new RuntimeException(e);
                             }
                             return null;
