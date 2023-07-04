@@ -373,7 +373,9 @@ public class TestcontainersKafkaCluster implements Startable, KafkaCluster, Kafk
                         inspectContainer.exec();
                     }
                     catch (NotFoundException e) {
-                        onBrokerStopped.accept(brokerId);
+                        if (onBrokerStopped != null) {
+                            onBrokerStopped.accept(brokerId);
+                        }
                         return true;
                     }
                     return false;

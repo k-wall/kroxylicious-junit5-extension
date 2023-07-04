@@ -385,7 +385,9 @@ public class InVMKafkaCluster implements KafkaCluster, KafkaClusterConfig.KafkaE
         if (await) {
             nodeMap.forEach((brokerId, server) -> {
                 server.awaitShutdown();
-                onBrokerStopped.accept(brokerId);
+                if (onBrokerStopped != null) {
+                    onBrokerStopped.accept(brokerId);
+                };
             });
         }
     }
