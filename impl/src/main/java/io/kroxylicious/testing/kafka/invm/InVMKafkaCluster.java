@@ -28,7 +28,6 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import io.kroxylicious.testing.kafka.api.TerminationStyle;
 import org.apache.kafka.common.utils.Time;
 import org.apache.zookeeper.server.ServerCnxnFactory;
 import org.apache.zookeeper.server.ZooKeeperServer;
@@ -43,6 +42,7 @@ import scala.Option;
 import scala.collection.immutable.Seq;
 
 import io.kroxylicious.testing.kafka.api.KafkaCluster;
+import io.kroxylicious.testing.kafka.api.TerminationStyle;
 import io.kroxylicious.testing.kafka.common.KafkaClusterConfig;
 import io.kroxylicious.testing.kafka.common.PortAllocator;
 import io.kroxylicious.testing.kafka.common.Utils;
@@ -323,18 +323,26 @@ public class InVMKafkaCluster implements KafkaCluster, KafkaClusterConfig.KafkaE
     }
 
     @Override
-    public synchronized void restartBrokers(Predicate<Integer> nodeIdPredicate, TerminationStyle terminationStyle) {
+    public synchronized void restartBrokers(Predicate<Integer> nodeIdPredicate, TerminationStyle terminationStyle, Runnable onBrokersStopped) {
         var kafkaServersToRestart = servers.entrySet().stream().filter(e -> nodeIdPredicate.test(e.getKey()))
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
         roleOrderedShutdown(kafkaServersToRestart, true);
 
-        kafkaServersToRestart.forEach((key, value) -> {
-            var configHolder = clusterConfig.generateConfigForSpecificNode(this, key);
-            var replacement = buildKafkaServer(configHolder);
-            tryToStartServerWithRetry(configHolder, replacement);
-            servers.put(key, replacement);
-        });
+        try {
+            if (onBrokersStopped != null) {
+                onBrokersStopped.run();
+            }
+        }
+        finally {
+            kafkaServersToRestart.forEach((key, value) -> {
+                var configHolder = clusterConfig.generateConfigForSpecificNode(this, key);
+                var replacement = buildKafkaServer(configHolder);
+                tryToStartServerWithRetry(configHolder, replacement);
+                servers.put(key, replacement);
+            });
+        }
+
     }
 
     @SuppressWarnings("ResultOfMethodCallIgnored")

@@ -13,7 +13,7 @@ import java.util.function.Predicate;
  * A KafkaCluster, from which is it possible to create/connect clients.
  * Clients can be created using {@link #getKafkaClientConfiguration()} or
  * {@link #getKafkaClientConfiguration(String, String)}.
- *
+ * <br/>
  * The cluster needs to be {@link #start() start}ed prior to use,
  * and should be {@link #close() close}d after use.
  */
@@ -54,11 +54,17 @@ public interface KafkaCluster extends AutoCloseable {
      * implementation is unable to support the requested style of termination. In this case, the implementation
      * is free to use an alternative termination style instead.
      * <br/>
+     * The caller may provide an <code>onBrokersStopped</code> runnable.  If not null, the runnable will be invoked,
+     * exactly once, when all the requested brokers are stopped. The restart of the brokers will not commence until
+     * this method returns.  Behaviour is not defined if the callable throws unchecked exceptions.  Furthermore, it
+     * must not attempt to mutate the cluster (that is, make calls to methods such as {@link KafkaCluster#addBroker()}).
+     * There is no guarantee made about the thread used to execute the callback.
      *
      * @param nodeIdPredicate  predicate that returns true if the node identified by the given nodeId should be restarted
      * @param terminationStyle the style of termination used to shut down the broker(s).
+     * @param onBrokersStopped callback to invoked when all brokers are stopped, before restart commences. may be null.
      */
-    void restartBrokers(Predicate<Integer> nodeIdPredicate, TerminationStyle terminationStyle);
+    void restartBrokers(Predicate<Integer> nodeIdPredicate, TerminationStyle terminationStyle, Runnable onBrokersStopped);
 
     /**
      * stops the cluster.

@@ -6,24 +6,29 @@
 package io.kroxylicious.testing.kafka;
 
 import java.io.IOException;
+import java.net.ConnectException;
+import java.net.Socket;
 import java.security.GeneralSecurityException;
 import java.time.Duration;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
-import io.kroxylicious.testing.kafka.api.TerminationStyle;
 import org.apache.kafka.clients.admin.Admin;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.Node;
 import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
@@ -31,7 +36,10 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import junit.framework.AssertionFailedError;
+
 import io.kroxylicious.testing.kafka.api.KafkaCluster;
+import io.kroxylicious.testing.kafka.api.TerminationStyle;
 import io.kroxylicious.testing.kafka.clients.CloseableAdmin;
 import io.kroxylicious.testing.kafka.clients.CloseableConsumer;
 import io.kroxylicious.testing.kafka.clients.CloseableProducer;
@@ -42,6 +50,7 @@ import io.kroxylicious.testing.kafka.common.KeytoolCertificateGenerator;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Test case that simply exercises the ability to control the kafka cluster from the test.
@@ -139,8 +148,31 @@ public class KafkaClusterTest {
             assertThat(cluster.getNumOfBrokers()).isEqualTo(brokersNum);
             verifyRecordRoundTrip(brokersNum, cluster);
 
-            cluster.restartBrokers(integerPredicate, terminationStyle);
+            var nodes = describeClusterNodes(cluster);
 
+            var brokersExpectedDown = nodes.stream().filter(n -> integerPredicate.test(n.id())).toList();
+            var brokerInUnexpectedState = new AtomicReference<AssertionFailedError>();
+
+            cluster.restartBrokers(integerPredicate, terminationStyle, () -> {
+                // The broker(s) are now expected to be down, check this is so by probing the host/port.
+                try {
+                    brokersExpectedDown.forEach(this::assertBrokerRefusesConnection);
+                }
+                catch (AssertionFailedError e) {
+                    brokerInUnexpectedState.set(e);
+                }
+                catch (Throwable t) {
+                    var afe = new AssertionFailedError(t.getMessage());
+                    afe.initCause(t);
+                    brokerInUnexpectedState.set(afe);
+                }
+            });
+
+            if (brokerInUnexpectedState.get() != null) {
+                throw brokerInUnexpectedState.get();
+            }
+
+            // ensures that all brokers of the cluster are back in service.
             verifyRecordRoundTrip(brokersNum, cluster);
         }
     }
@@ -429,6 +461,26 @@ public class KafkaClusterTest {
 
     private void deleteTopic(Admin admin, String topic) throws Exception {
         admin.deleteTopics(List.of(topic)).all().get();
+    }
+
+    private Collection<Node> describeClusterNodes(KafkaCluster cluster) {
+        try (var admin = CloseableAdmin.create(cluster.getKafkaClientConfiguration())) {
+            return Awaitility.waitAtMost(Duration.ofSeconds(10)).until(() -> admin.describeCluster().nodes().get(2, TimeUnit.SECONDS),
+                    n -> n.size() == cluster.getNumOfBrokers());
+        }
+    }
+
+    private void assertBrokerRefusesConnection(Node n) {
+        try (var ignored = new Socket(n.host(), n.port())) {
+            // If we get this far, the connection has been established, which is unexpected.
+            fail("unexpected successful connection open to broker " + n);
+        }
+        catch (ConnectException e) {
+            // pass - this is the expected "connection refused"
+        }
+        catch (Throwable e) {
+            fail("unexpected exception probing for broker " + n, e);
+        }
     }
 
     @BeforeEach

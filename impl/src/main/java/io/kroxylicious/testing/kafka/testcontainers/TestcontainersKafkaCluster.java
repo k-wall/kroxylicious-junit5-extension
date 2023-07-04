@@ -30,7 +30,6 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
-import io.kroxylicious.testing.kafka.api.TerminationStyle;
 import org.apache.kafka.common.config.SslConfigs;
 import org.awaitility.Awaitility;
 import org.jetbrains.annotations.NotNull;
@@ -50,6 +49,7 @@ import kafka.server.KafkaConfig;
 import lombok.SneakyThrows;
 
 import io.kroxylicious.testing.kafka.api.KafkaCluster;
+import io.kroxylicious.testing.kafka.api.TerminationStyle;
 import io.kroxylicious.testing.kafka.common.KafkaClusterConfig;
 import io.kroxylicious.testing.kafka.common.PortAllocator;
 import io.kroxylicious.testing.kafka.common.Utils;
@@ -344,7 +344,7 @@ public class TestcontainersKafkaCluster implements Startable, KafkaCluster, Kafk
     }
 
     @Override
-    public synchronized void restartBrokers(Predicate<Integer> nodeIdPredicate, TerminationStyle terminationStyle) {
+    public synchronized void restartBrokers(Predicate<Integer> nodeIdPredicate, TerminationStyle terminationStyle, Runnable onBrokersStopped) {
         var kafkaContainersToRestart = brokers.entrySet().stream().filter(e -> nodeIdPredicate.test(e.getKey())).map(Map.Entry::getValue).toList();
 
         var inspectCommands = kafkaContainersToRestart.stream().map(kc -> kc.getDockerClient().inspectContainerCmd(kc.getContainerId())).toList();
@@ -390,31 +390,38 @@ public class TestcontainersKafkaCluster implements Startable, KafkaCluster, Kafk
                     });
         }
 
-        LOGGER.log(Level.DEBUG, "Restarting {0}/{1} broker(s)", kafkaContainersToRestart.size(), getNumOfBrokers());
-        kafkaContainersToRestart.forEach(kc -> {
-            var originalStartupAttempts = kc.getStartupAttempts();
-            try {
-                // We need to control the restart loop ourselves. Unfortunately testcontainers does not
-                // allow a delay to be introduced between startup attempts and start-ups in a tight loop
-                // seems to lead to podman unreliability (at least on the Mac).
-                kc.withStartupAttempts(1);
-                Awaitility.waitAtMost(STARTUP_TIMEOUT)
-                        .pollDelay(RESTART_BACKOFF_DELAY).until(() -> {
-                            try {
-                                kc.start();
-                            }
-                            catch (Exception e) {
-                                kc.stop();
-                                LOGGER.log(Level.DEBUG, "Failed to restart container", e);
-                                throw new RuntimeException(e);
-                            }
-                            return null;
-                        });
+        try {
+            if (onBrokersStopped != null) {
+                onBrokersStopped.run();
             }
-            finally {
-                kc.setStartupAttempts(originalStartupAttempts);
-            }
-        });
+        }
+        finally {
+            LOGGER.log(Level.DEBUG, "Restarting {0}/{1} broker(s)", kafkaContainersToRestart.size(), getNumOfBrokers());
+            kafkaContainersToRestart.forEach(kc -> {
+                var originalStartupAttempts = kc.getStartupAttempts();
+                try {
+                    // We need to control the restart loop ourselves. Unfortunately testcontainers does not
+                    // allow a delay to be introduced between startup attempts and start-ups in a tight loop
+                    // seems to lead to podman unreliability (at least on the Mac).
+                    kc.withStartupAttempts(1);
+                    Awaitility.waitAtMost(STARTUP_TIMEOUT)
+                            .pollDelay(RESTART_BACKOFF_DELAY).until(() -> {
+                                try {
+                                    kc.start();
+                                }
+                                catch (Exception e) {
+                                    kc.stop();
+                                    LOGGER.log(Level.DEBUG, "Failed to restart container", e);
+                                    throw new RuntimeException(e);
+                                }
+                                return null;
+                            });
+                }
+                finally {
+                    kc.setStartupAttempts(originalStartupAttempts);
+                }
+            });
+        }
 
         LOGGER.log(Level.DEBUG, "Awaiting for the expected number of brokers {0} to be available again", getNumOfBrokers());
         Utils.awaitExpectedBrokerCountInClusterViaTopic(
