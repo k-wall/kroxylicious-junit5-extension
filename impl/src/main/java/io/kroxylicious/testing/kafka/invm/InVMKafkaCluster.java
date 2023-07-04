@@ -366,13 +366,13 @@ public class InVMKafkaCluster implements KafkaCluster, KafkaClusterConfig.KafkaE
      * with kraft, if we don't shut down the controller last, we sometimes see a hang.
      */
     private void orderedShutdownServers(Map<Integer, Server> servers, boolean await) {
-        var noneControllers = servers.entrySet().stream()
+        var justBrokers = servers.entrySet().stream()
                 .filter(e -> !portsAllocator.hasRegisteredPort(Listener.CONTROLLER, e.getKey()))
                 .map(Map.Entry::getValue)
                 .toList();
-        noneControllers.forEach(Server::shutdown);
+        justBrokers.forEach(Server::shutdown);
         if (await) {
-            noneControllers.forEach(Server::awaitShutdown);
+            justBrokers.forEach(Server::awaitShutdown);
         }
 
         var controllers = servers.entrySet().stream()
