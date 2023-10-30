@@ -17,10 +17,11 @@
 name: Stage Release
 
 # This workflow will stage a kroxylicious junit extension release.  The release artefacts will be
-# built, signed, and staged. The release will be tagged a PR.
+# built, signed, and staged on Nexus.  The staging repository will be closed.  A PR will be opened
+# containing commits that versions the release and reopen main for development at the next snapshot version.
 #
-# Once the staged artefacts have been verified, run the workflow deploy_release to release the artefacts
-# to Maven Central and merge the release PR.
+# Once the staged artefacts have been verified, run the workflow deploy_release with the argument `release` to
+# release the artefacts to Maven Central and merge the release PR.
 #
 # It requires the following:
 # variables:
@@ -88,6 +89,13 @@ jobs:
           gpg-private-key: ${{ secrets.KROXYLICIOUS_RELEASE_GPG_PRIVATE_KEY }} # Value of the GPG private key to import
           overwrite-settings: true
 
+      - name: 'Verify no existing staging repository'
+        if: ${{ github.event.inputs.dry-run == 'false' }}
+        env:
+          SONAR_TYPE_TOKEN_USERNAME: ${{ vars.KROXYLICIOUS_SONAR_TYPE_TOKEN_USERNAME }}
+          SONAR_TYPE_TOKEN_PASSWORD: ${{ secrets.KROXYLICIOUS_SONAR_TYPE_TOKEN_PASSWORD }}
+        run: ./scripts/transition-staging-repository-state.sh -a
+
       - name: 'Stage Release'
         run: |
           SIGNING_KEY_SHORT_NAME=$(gpg --list-public-keys --keyid-format short --with-colons | awk -F: '/^pub:/ {print $5}')
@@ -102,37 +110,17 @@ jobs:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.KROXYLICIOUS_RELEASE_GPG_PASSPHRASE }}
           GH_TOKEN: ${{ secrets.KROXYLICIOUS_RELEASE_TOKEN }} # For the gh cmd line tool used by stage-release.sh
 
-      - name: 'Drop repo'
+      - name: 'Drop repo stage if failed'
         if: ${{ failure() && github.event.inputs.dry-run == 'false' }}
         env:
           SONAR_TYPE_TOKEN_USERNAME: ${{ vars.KROXYLICIOUS_SONAR_TYPE_TOKEN_USERNAME }}
           SONAR_TYPE_TOKEN_PASSWORD: ${{ secrets.KROXYLICIOUS_SONAR_TYPE_TOKEN_PASSWORD }}
-        run: |
-          # Maven deploy leaves the Nexus Staging Repo open, let's drop it
-          PLUGIN=org.sonatype.plugins:nexus-staging-maven-plugin:1.6.13
-          # Parse the repo_id from the table rendered by rc-list
-          #debug
-          cat /home/runner/.m2/settings.xml
-          mvn ${PLUGIN}:rc-list -DnexusUrl=https://s01.oss.sonatype.org/ -DserverId=ossrh 
-          
-          STAGING_REPO_ID=$(mvn ${PLUGIN}:rc-list -DnexusUrl=https://s01.oss.sonatype.org/ -DserverId=ossrh | awk 'f{print $2;f=0} /.INFO.*ID.*State.*Description/{f=1}')
-          echo "Staging repo id ${STAGING_REPO_ID}"
-          mvn ${PLUGIN}:drop -DnexusUrl=https://s01.oss.sonatype.org/ -DserverId=ossrh -DstagingRepositoryId=${STAGING_REPO_ID}
+        run: ./scripts/transition-staging-repository-state.sh -s drop
 
       - name: 'Close repo'
         if: ${{ github.event.inputs.dry-run == 'false' }}
         env:
           SONAR_TYPE_TOKEN_USERNAME: ${{ vars.KROXYLICIOUS_SONAR_TYPE_TOKEN_USERNAME }}
           SONAR_TYPE_TOKEN_PASSWORD: ${{ secrets.KROXYLICIOUS_SONAR_TYPE_TOKEN_PASSWORD }}
-        run: |
-          # Maven deploy leaves the Nexus Staging Repo open, let's close it
-          PLUGIN=org.sonatype.plugins:nexus-staging-maven-plugin:1.6.13
-          #debug
-          cat /home/runner/.m2/settings.xml
-          mvn ${PLUGIN}:rc-list -DnexusUrl=https://s01.oss.sonatype.org/ -DserverId=ossrh 
-
-          # Parse the repo_id from the table rendered by rc-list
-          STAGING_REPO_ID=$(mvn ${PLUGIN}:rc-list -DnexusUrl=https://s01.oss.sonatype.org/ -DserverId=ossrh | awk 'f{print $2;f=0} /.INFO.*ID.*State.*Description/{f=1}')
-          echo "Staging repo id ${STAGING_REPO_ID}"
-          mvn ${PLUGIN}:close -DnexusUrl=https://s01.oss.sonatype.org/ -DserverId=ossrh -DstagingRepositoryId=${STAGING_REPO_ID}
+        run: ./scripts/transition-staging-repository-state.sh -s close
 
