@@ -26,7 +26,7 @@ name: Stage Release
 # variables:
 # KROXYLICIOUS_SONAR_TYPE_TOKEN_USERNAME - Sonar Type Access User Token Username
 # secrets:
-# KROXYLICIOUS_RELEASE_TOKEN             - GitHub PAT wih content permission for Kroxylicious repo.
+# KROXYLICIOUS_RELEASE_TOKEN             - GitHub PAT wih content/createPullRequest permission for Kroxylicious repo.
 # KROXYLICIOUS_RELEASE_GPG_PRIVATE_KEY   - GPG private key for Kroxylicious
 # KROXYLICIOUS_RELEASE_GPG_PASSPHRASE    - GPG passphrase
 # KROXYLICIOUS_SONAR_TYPE_TOKEN_PASSWORD - Sonar Type Access User Token Password
