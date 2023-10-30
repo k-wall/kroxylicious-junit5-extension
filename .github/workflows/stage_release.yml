@@ -103,9 +103,9 @@ jobs:
           GH_TOKEN: ${{ secrets.KROXYLICIOUS_RELEASE_TOKEN }} # For the gh cmd line tool used by release.sh
 
       - name: 'Drop repo'
-        if: failed() && ${{ github.event.inputs.dry-run == 'false' }}
+        if: ${{ failure() && github.event.inputs.dry-run == 'false' }}
         run: |
-          # Maven deploy leaves the Nexus Staging Repo open, let's close it
+          # Maven deploy leaves the Nexus Staging Repo open, let's drop it
           PLUGIN=org.sonatype.plugins:nexus-staging-maven-plugin:1.6.13
           # Parse the repo_id from the table rendered by rc-list
           STAGING_REPO_ID=$(mvn ${PLUGIN}:rc-list -DnexusUrl=https://s01.oss.sonatype.org/ -DserverId=ossrh | awk 'f{print $2;f=0} /.INFO.*ID.*State.*Description/{f=1}')
