@@ -104,6 +104,9 @@ jobs:
 
       - name: 'Drop repo'
         if: ${{ failure() && github.event.inputs.dry-run == 'false' }}
+        env:
+          SONAR_TYPE_TOKEN_USERNAME: ${{ vars.KROXYLICIOUS_SONAR_TYPE_TOKEN_USERNAME }}
+          SONAR_TYPE_TOKEN_PASSWORD: ${{ secrets.KROXYLICIOUS_SONAR_TYPE_TOKEN_PASSWORD }}
         run: |
           # Maven deploy leaves the Nexus Staging Repo open, let's drop it
           PLUGIN=org.sonatype.plugins:nexus-staging-maven-plugin:1.6.13
@@ -118,6 +121,9 @@ jobs:
 
       - name: 'Close repo'
         if: ${{ github.event.inputs.dry-run == 'false' }}
+        env:
+          SONAR_TYPE_TOKEN_USERNAME: ${{ vars.KROXYLICIOUS_SONAR_TYPE_TOKEN_USERNAME }}
+          SONAR_TYPE_TOKEN_PASSWORD: ${{ secrets.KROXYLICIOUS_SONAR_TYPE_TOKEN_PASSWORD }}
         run: |
           # Maven deploy leaves the Nexus Staging Repo open, let's close it
           PLUGIN=org.sonatype.plugins:nexus-staging-maven-plugin:1.6.13
