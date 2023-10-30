@@ -92,8 +92,8 @@ jobs:
           ./scripts/release.sh -k ${SIGNING_KEY_SHORT_NAME} \
                                -v ${{ github.event.inputs.release-version }} \
                                -b ${{ github.event.inputs.branch }} \
-                              ${{ github.event.inputs.dry-run && '-d' || '' }} \
-                              ${{ github.event.inputs.skip-tests && '-s' || '' }}
+                              ${{ github.event.inputs.dry-run == 'true' && '-d' || '' }} \
+                              ${{ github.event.inputs.skip-tests == 'true' && '-s' || '' }}
         env:
           MAVEN_USERNAME: ${{ vars.KROXYLICIOUS_SONAR_TYPE_TOKEN_USERNAME }}
           MAVEN_CENTRAL_TOKEN: ${{ secrets.KROXYLICIOUS_SONAR_TYPE_TOKEN_PASSWORD }}
