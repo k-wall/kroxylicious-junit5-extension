@@ -168,4 +168,4 @@ gh repo set-default $(git remote get-url ${REPOSITORY})
 BODY="Release version ${RELEASE_VERSION}"
 
 echo "Create pull request to merge the released version."
-gh pr create --base ${BRANCH_FROM} --title "Kroxylicious junit extension development version ${RELEASE_DATE}" --body "${BODY}" --repo $(gh repo set-default -v)
+gh pr create --head ${PREPARE_DEVELOPMENT_BRANCH} --base ${BRANCH_FROM} --title "Kroxylicious junit extension development version ${RELEASE_DATE}" --body "${BODY}" --repo $(gh repo set-default -v)
