@@ -109,6 +109,7 @@ jobs:
           PLUGIN=org.sonatype.plugins:nexus-staging-maven-plugin:1.6.13
           # Parse the repo_id from the table rendered by rc-list
           #debug
+          cat /home/runner/.m2/settings.xml
           mvn ${PLUGIN}:rc-list -DnexusUrl=https://s01.oss.sonatype.org/ -DserverId=ossrh 
           
           STAGING_REPO_ID=$(mvn ${PLUGIN}:rc-list -DnexusUrl=https://s01.oss.sonatype.org/ -DserverId=ossrh | awk 'f{print $2;f=0} /.INFO.*ID.*State.*Description/{f=1}')
