@@ -20,7 +20,7 @@ name: Stage Release
 # built, signed, and staged. The release will be tagged a PR.
 #
 # Once the staged artefacts have been verified, run the workflow deploy_release to release the artefacts
-# to Maven Cental and merge the release PR.
+# to Maven Central and merge the release PR.
 #
 # It requires the following:
 # variables:
