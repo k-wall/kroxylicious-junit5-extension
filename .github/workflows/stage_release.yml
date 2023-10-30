@@ -100,6 +100,17 @@ jobs:
           SONAR_TYPE_TOKEN_USERNAME: ${{ vars.KROXYLICIOUS_SONAR_TYPE_TOKEN_USERNAME }}
           SONAR_TYPE_TOKEN_PASSWORD: ${{ secrets.KROXYLICIOUS_SONAR_TYPE_TOKEN_PASSWORD }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.KROXYLICIOUS_RELEASE_GPG_PASSPHRASE }}
+          GH_TOKEN: ${{ secrets.KROXYLICIOUS_RELEASE_TOKEN }} # For the gh cmd line tool used by release.sh
+
+      - name: 'Drop repo'
+        if: failed() && ${{ github.event.inputs.dry-run == 'false' }}
+        run: |
+          # Maven deploy leaves the Nexus Staging Repo open, let's close it
+          PLUGIN=org.sonatype.plugins:nexus-staging-maven-plugin:1.6.13
+          # Parse the repo_id from the table rendered by rc-list
+          STAGING_REPO_ID=$(mvn ${PLUGIN}:rc-list -DnexusUrl=https://s01.oss.sonatype.org/ -DserverId=ossrh | awk 'f{print $2;f=0} /.INFO.*ID.*State.*Description/{f=1}')
+          echo "Staging repo id ${STAGING_REPO_ID}"
+          mvn ${PLUGIN}:drop -DnexusUrl=https://s01.oss.sonatype.org/ -DserverId=ossrh -DstagingRepositoryId=${STAGING_REPO_ID}
 
       - name: 'Close repo'
         if: ${{ github.event.inputs.dry-run == 'false' }}
@@ -110,3 +121,4 @@ jobs:
           STAGING_REPO_ID=$(mvn ${PLUGIN}:rc-list -DnexusUrl=https://s01.oss.sonatype.org/ -DserverId=ossrh | awk 'f{print $2;f=0} /.INFO.*ID.*State.*Description/{f=1}')
           echo "Staging repo id ${STAGING_REPO_ID}"
           mvn ${PLUGIN}:close -DnexusUrl=https://s01.oss.sonatype.org/ -DserverId=ossrh -DstagingRepositoryId=${STAGING_REPO_ID}
+
