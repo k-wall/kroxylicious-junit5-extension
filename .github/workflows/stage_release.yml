@@ -82,8 +82,10 @@ jobs:
           java-version: 17
           distribution: temurin
           server-id: ossrh
-          gpg-private-key: ${{ secrets.KROXYLICIOUS_RELEASE_GPG_PRIVATE_KEY }} # Value of the GPG private key to import
+          server-username: SONAR_TYPE_TOKEN_USERNAME # env variable for Sonar Type username
+          server-password: SONAR_TYPE_TOKEN_PASSWORD # env variable for Sonar Type password
           gpg-passphrase: MAVEN_GPG_PASSPHRASE # env variable for GPG private key passphrase
+          gpg-private-key: ${{ secrets.KROXYLICIOUS_RELEASE_GPG_PRIVATE_KEY }} # Value of the GPG private key to import
           overwrite-settings: true
 
       - name: 'Stage Release'
@@ -95,8 +97,8 @@ jobs:
                               ${{ github.event.inputs.dry-run == 'true' && '-d' || '' }} \
                               ${{ github.event.inputs.skip-tests == 'true' && '-s' || '' }}
         env:
-          MAVEN_USERNAME: ${{ vars.KROXYLICIOUS_SONAR_TYPE_TOKEN_USERNAME }}
-          MAVEN_CENTRAL_TOKEN: ${{ secrets.KROXYLICIOUS_SONAR_TYPE_TOKEN_PASSWORD }}
+          SONAR_TYPE_TOKEN_USERNAME: ${{ vars.KROXYLICIOUS_SONAR_TYPE_TOKEN_USERNAME }}
+          SONAR_TYPE_TOKEN_PASSWORD: ${{ secrets.KROXYLICIOUS_SONAR_TYPE_TOKEN_PASSWORD }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.KROXYLICIOUS_RELEASE_GPG_PASSPHRASE }}
 
       - name: 'Close repo'
