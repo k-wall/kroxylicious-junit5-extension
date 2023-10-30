@@ -91,16 +91,16 @@ jobs:
       - name: 'Stage Release'
         run: |
           SIGNING_KEY_SHORT_NAME=$(gpg --list-public-keys --keyid-format short --with-colons | awk -F: '/^pub:/ {print $5}')
-          ./scripts/release.sh -k ${SIGNING_KEY_SHORT_NAME} \
-                               -v ${{ github.event.inputs.release-version }} \
-                               -b ${{ github.event.inputs.branch }} \
-                              ${{ github.event.inputs.dry-run == 'true' && '-d' || '' }} \
-                              ${{ github.event.inputs.skip-tests == 'true' && '-s' || '' }}
+          ./scripts/stage-release.sh -k ${SIGNING_KEY_SHORT_NAME} \
+                                     -v ${{ github.event.inputs.release-version }} \
+                                     -b ${{ github.event.inputs.branch }} \
+                                     ${{ github.event.inputs.dry-run == 'true' && '-d' || '' }} \
+                                     ${{ github.event.inputs.skip-tests == 'true' && '-s' || '' }}
         env:
           SONAR_TYPE_TOKEN_USERNAME: ${{ vars.KROXYLICIOUS_SONAR_TYPE_TOKEN_USERNAME }}
           SONAR_TYPE_TOKEN_PASSWORD: ${{ secrets.KROXYLICIOUS_SONAR_TYPE_TOKEN_PASSWORD }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.KROXYLICIOUS_RELEASE_GPG_PASSPHRASE }}
-          GH_TOKEN: ${{ secrets.KROXYLICIOUS_RELEASE_TOKEN }} # For the gh cmd line tool used by release.sh
+          GH_TOKEN: ${{ secrets.KROXYLICIOUS_RELEASE_TOKEN }} # For the gh cmd line tool used by stage-release.sh
 
       - name: 'Drop repo'
         if: ${{ failure() && github.event.inputs.dry-run == 'false' }}

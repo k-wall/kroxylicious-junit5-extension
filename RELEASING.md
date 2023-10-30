@@ -15,7 +15,7 @@ Firstly ensure that you have completed the [release requirements](https://github
 the release script to actually perform the release and prepare main for the next development version.
 
 ```shell
-./scripts/release.sh -k <YOUR_KEY_SHORT_ID> -v <RELEASE_VERSION>
+./scripts/stage-release.sh -k <YOUR_KEY_SHORT_ID> -v <RELEASE_VERSION>
 ```
 
 where `<YOUR_KEY_SHORT_ID>` is the short id of your PGP key
