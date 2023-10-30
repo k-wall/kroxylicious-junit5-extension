@@ -68,7 +68,7 @@ jobs:
       - name: 'Configure Git username/email'
         run: |
           git config user.name "${GITHUB_ACTOR}"
-          git config user.email kroxylicious@redhat.com
+          git config user.email "${GITHUB_ACTOR_ID}+${GITHUB_ACTOR}@users.noreply.github.com"
 
       - name: 'Cache Maven packages'
         uses: actions/cache@v2
