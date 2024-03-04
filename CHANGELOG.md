@@ -4,6 +4,7 @@ Please enumerate all user-facing changes using format `<githib issue/pr number>:
 
 ## 1.0.0
 
+## SNAPSHOT
 ## 0.9.0
 
 ## 0.8.1
