@@ -4,6 +4,7 @@ Please enumerate all user-facing changes using format `<githib issue/pr number>:
 
 ## 1.0.0
 
+## SNAPSHOT
 ## 0.10.0
 
 * [##419](https://github.com/kroxylicious/kroxylicious-junit5-extension/pull/#419): Refactor endpoint creation and allow client connections to be formed to controllers in container mode.
